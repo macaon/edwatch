@@ -236,5 +236,51 @@ class SystemOrrery(tk.Tk):
                 
         self.after(0, self.draw_system)
         self.after(0, self.update_body_list)
+    def monitor_logs(self):
+        directory = os.path.expandvars(r'C:\Users\%USERNAME%\Saved Games\Frontier Developments\Elite Dangerous')
+        logging.info(f"Monitoring directory: {directory}")
+        
+        while self.running:
+            newest_file = self.get_newest_file(directory)
+            if newest_file:
+                logging.info(f"Reading from file: {newest_file}")
+                try:
+                    with open(newest_file, 'r', encoding='utf-8') as file:
+                        file.seek(0, os.SEEK_END)
+                        while self.running:
+                            line = file.readline()
+                            if line:
+                                try:
+                                    data = json.loads(line.strip())
+                                    self.process_log_entry(data)
+                                except json.JSONDecodeError as e:
+                                    logging.error(f"Failed to parse log line: {e}")
+                                    logging.error(f"Problematic line: {line}")
+                            time.sleep(0.1)
+                except FileNotFoundError:
+                    logging.error(f"File not found: {newest_file}")
+            time.sleep(1)
+    
+    def get_newest_file(self, directory):
+        try:
+            files = [os.path.join(directory, f) for f in os.listdir(directory) 
+                    if f.startswith('Journal.') and f.endswith('.log')]
+            files = [f for f in files if os.path.isfile(f)]
+            if not files:
+                return None
+            return max(files, key=os.path.getmtime)
+        except Exception as e:
+            logging.error(f"Failed to get newest file: {e}")
+            return None
+    
+    def on_closing(self):
+        logging.info("Shutting down System Orrery")
+        self.running = False
+        self.destroy()
 
-    # [Rest of the existing methods remain the same]
+if __name__ == "__main__":
+    logging.info("Starting Elite Dangerous System Orrery")
+    app = SystemOrrery()
+    app.protocol("WM_DELETE_WINDOW", app.on_closing)
+    app.mainloop()
+
